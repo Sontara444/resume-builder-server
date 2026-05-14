@@ -16,11 +16,11 @@ exports.getResumes = async (req, res) => {
 exports.saveResume = async (req, res) => {
   try {
     const resumeData = req.body;
-    
+
     if (resumeData._id) {
       const updated = await Resume.findByIdAndUpdate(
-        resumeData._id, 
-        { ...resumeData, lastModified: Date.now() }, 
+        resumeData._id,
+        { ...resumeData, lastModified: Date.now() },
         { new: true }
       );
       return res.json(updated);
@@ -56,7 +56,7 @@ exports.duplicateResume = async (req, res) => {
     delete duplicateData._id;
     delete duplicateData.createdAt;
     delete duplicateData.updatedAt;
-    
+
     duplicateData.name = `${duplicateData.name} (Copy)`;
     duplicateData.lastModified = Date.now();
 
