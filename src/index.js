@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const resumeRoutes = require('./routes/resumeRoutes');
+const contactRoutes = require('./routes/contactRoutes');
 
 const app = express();
 
@@ -17,6 +18,7 @@ const startServer = async () => {
 
     // Routes
     app.use('/api/resumes', resumeRoutes);
+    app.use('/api/contact', contactRoutes);
 
     // Health Check
     app.get('/', (req, res) => {
