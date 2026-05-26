@@ -6,6 +6,10 @@ const {
   deleteResume, 
   duplicateResume 
 } = require('../controllers/resumeController');
+const { protect } = require('../middleware/authMiddleware');
+
+// Apply JWT verification layer
+router.use(protect);
 
 router.get('/', getResumes);
 router.post('/', saveResume);

@@ -4,6 +4,7 @@ const cors = require('cors');
 const connectDB = require('./config/db');
 const resumeRoutes = require('./routes/resumeRoutes');
 const contactRoutes = require('./routes/contactRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 
@@ -19,6 +20,7 @@ const startServer = async () => {
     // Routes
     app.use('/api/resumes', resumeRoutes);
     app.use('/api/contact', contactRoutes);
+    app.use('/api/auth', authRoutes);
 
     // Health Check
     app.get('/', (req, res) => {
