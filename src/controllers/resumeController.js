@@ -91,3 +91,31 @@ exports.duplicateResume = async (req, res) => {
     res.status(500).json({ error: 'Failed to duplicate resume' });
   }
 };
+
+// @desc    Rename a resume
+// @route   PATCH /api/resumes/:id/rename
+exports.renameResume = async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Name cannot be empty' });
+    }
+
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    if (resume.userId !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Not authorized to modify this resume' });
+    }
+
+    resume.name = name.trim();
+    resume.lastModified = Date.now();
+    await resume.save();
+    res.json(resume);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to rename resume' });
+  }
+};
+

@@ -4,7 +4,8 @@ const {
   getResumes, 
   saveResume, 
   deleteResume, 
-  duplicateResume 
+  duplicateResume,
+  renameResume
 } = require('../controllers/resumeController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -15,5 +16,7 @@ router.get('/', getResumes);
 router.post('/', saveResume);
 router.delete('/:id', deleteResume);
 router.post('/:id/duplicate', duplicateResume);
+router.patch('/:id/rename', renameResume);
+
 
 module.exports = router;
