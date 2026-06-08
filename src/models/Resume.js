@@ -48,6 +48,25 @@ const ResumeSchema = new mongoose.Schema({
       location: String
     }
   ],
+  sectionOrder: {
+    type: [String],
+    default: ['summary', 'skills', 'experience', 'projects', 'education']
+  },
+  customSections: [
+    {
+      id: String,
+      title: String,
+      items: [
+        {
+          id: String,
+          title: String,
+          subtitle: String,
+          duration: String,
+          description: [String]
+        }
+      ]
+    }
+  ],
   template: { type: String, default: 'vibrant' },
   themeColor: { type: String, default: '#ff9100' }
 }, { timestamps: true });
