@@ -119,3 +119,36 @@ exports.renameResume = async (req, res) => {
   }
 };
 
+// @desc    Update tags for a resume
+// @route   PATCH /api/resumes/:id/tags
+exports.updateTags = async (req, res) => {
+  try {
+    const { tags } = req.body;
+    if (!Array.isArray(tags)) {
+      return res.status(400).json({ error: 'Tags must be an array' });
+    }
+    
+    // Max 5 tags validation
+    if (tags.length > 5) {
+      return res.status(400).json({ error: 'Maximum 5 tags allowed' });
+    }
+
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    if (resume.userId !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Not authorized to modify this resume' });
+    }
+
+    // Ensure tags are unique
+    resume.tags = [...new Set(tags.map(t => t.trim()))].filter(Boolean);
+    resume.lastModified = Date.now();
+    await resume.save();
+    res.json(resume);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update tags' });
+  }
+};
+
