@@ -118,3 +118,60 @@ Optimized version:`;
     res.status(500).json({ error: 'Failed to optimize text' });
   }
 };
+
+const fallbackExtractKeywords = (jdText) => {
+  const commonTech = ['react', 'node.js', 'node', 'express', 'mongodb', 'sql', 'nosql', 'postgres', 'postgresql', 'mysql', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'typescript', 'javascript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'rust', 'graphql', 'rest', 'api', 'redux', 'next.js', 'vue', 'angular', 'html', 'css', 'sass', 'tailwind', 'git', 'ci/cd', 'agile', 'scrum', 'jira', 'linux'];
+  const lowerJd = jdText.toLowerCase();
+  const extracted = [];
+  
+  commonTech.forEach(tech => {
+    // simple word boundary match
+    const regex = new RegExp('\\b' + tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g');
+    if (regex.test(lowerJd)) {
+      extracted.push(tech.charAt(0).toUpperCase() + tech.slice(1));
+    }
+  });
+
+  return extracted.join(', ');
+};
+
+exports.extractKeywords = async (req, res) => {
+  try {
+    const { jdText } = req.body;
+    if (!jdText || !jdText.trim()) {
+      return res.status(400).json({ error: 'Job description content is required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const prompt = `You are an expert technical recruiter and ATS optimization specialist.
+Extract the most important technical skills, tools, and keywords from the following job description.
+Return ONLY a comma-separated list of the keywords. Do not include introductory text, bullet points, or newlines. Limit to the top 15 most important keywords.
+
+Job Description:
+"${jdText}"
+
+Keywords:`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const keywords = response.text().trim();
+        if (keywords) {
+          return res.json({ keywords });
+        }
+      } catch (geminiError) {
+        console.warn('Gemini API call failed for keyword extraction, falling back:', geminiError.message);
+      }
+    }
+
+    const keywords = fallbackExtractKeywords(jdText);
+    return res.json({ keywords });
+  } catch (err) {
+    console.error('Error extracting keywords:', err);
+    res.status(500).json({ error: 'Failed to extract keywords' });
+  }
+};
+
