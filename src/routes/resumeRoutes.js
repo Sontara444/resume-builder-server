@@ -6,7 +6,10 @@ const {
   deleteResume, 
   duplicateResume,
   renameResume,
-  updateTags
+  updateTags,
+  getVersions,
+  createVersion,
+  deleteVersion
 } = require('../controllers/resumeController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -20,5 +23,8 @@ router.post('/:id/duplicate', duplicateResume);
 router.patch('/:id/rename', renameResume);
 router.patch('/:id/tags', updateTags);
 
+router.get('/:id/versions', getVersions);
+router.post('/:id/versions', createVersion);
+router.delete('/versions/:versionId', deleteVersion);
 
 module.exports = router;

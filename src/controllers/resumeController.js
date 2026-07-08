@@ -1,4 +1,5 @@
 const Resume = require('../models/Resume');
+const ResumeVersion = require('../models/ResumeVersion');
 
 // @desc    Get all resumes
 // @route   GET /api/resumes
@@ -152,3 +153,82 @@ exports.updateTags = async (req, res) => {
   }
 };
 
+// @desc    Get all versions for a resume
+// @route   GET /api/resumes/:id/versions
+exports.getVersions = async (req, res) => {
+  try {
+    const resumeId = req.params.id;
+    const resume = await Resume.findById(resumeId);
+    if (!resume) return res.status(404).json({ error: 'Resume not found' });
+    if (resume.userId !== String(req.user._id) && resume.userId !== 'anonymous') {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const versions = await ResumeVersion.find({ resumeId }).sort({ createdAt: -1 });
+    res.json(versions);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch versions' });
+  }
+};
+
+// @desc    Create a new version for a resume
+// @route   POST /api/resumes/:id/versions
+exports.createVersion = async (req, res) => {
+  try {
+    const resumeId = req.params.id;
+    const { data } = req.body;
+    
+    if (!data) return res.status(400).json({ error: 'Resume data is required' });
+
+    const resume = await Resume.findById(resumeId);
+    if (!resume) return res.status(404).json({ error: 'Resume not found' });
+    
+    if (resume.userId !== String(req.user._id) && resume.userId !== 'anonymous') {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    const versions = await ResumeVersion.find({ resumeId }).sort({ createdAt: -1 });
+    const versionNumber = versions.length > 0 ? versions[0].versionNumber + 1 : 1;
+
+    const newVersion = new ResumeVersion({
+      resumeId,
+      userId: req.user._id,
+      versionNumber,
+      name: data.name || resume.name,
+      data
+    });
+
+    await newVersion.save();
+
+    if (versions.length >= 20) {
+      const versionsToDelete = versions.slice(19);
+      for (const v of versionsToDelete) {
+        await ResumeVersion.findByIdAndDelete(v._id);
+      }
+    }
+
+    res.status(201).json(newVersion);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to create version' });
+  }
+};
+
+// @desc    Delete a resume version
+// @route   DELETE /api/resumes/versions/:versionId
+exports.deleteVersion = async (req, res) => {
+  try {
+    const versionId = req.params.versionId;
+    const version = await ResumeVersion.findById(versionId);
+    if (!version) return res.status(404).json({ error: 'Version not found' });
+
+    if (version.userId !== String(req.user._id) && version.userId !== 'anonymous') {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    await ResumeVersion.findByIdAndDelete(versionId);
+    res.json({ message: 'Version deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete version' });
+  }
+};
