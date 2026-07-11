@@ -232,3 +232,49 @@ exports.deleteVersion = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete version' });
   }
 };
+
+// @desc    Get a public resume by ID
+// @route   GET /api/resumes/public/:id
+exports.getPublicResume = async (req, res) => {
+  try {
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    if (!resume.isPublic) {
+      return res.status(403).json({ error: 'This resume is private' });
+    }
+
+    res.json(resume);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch public resume' });
+  }
+};
+
+// @desc    Toggle public status of a resume
+// @route   PATCH /api/resumes/:id/public
+exports.togglePublicStatus = async (req, res) => {
+  try {
+    const { isPublic } = req.body;
+    if (typeof isPublic !== 'boolean') {
+      return res.status(400).json({ error: 'isPublic must be a boolean' });
+    }
+
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    if (resume.userId !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Not authorized to modify this resume' });
+    }
+
+    resume.isPublic = isPublic;
+    resume.lastModified = Date.now();
+    await resume.save();
+    res.json(resume);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update public status' });
+  }
+};
