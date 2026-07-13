@@ -11,7 +11,9 @@ const {
   createVersion,
   deleteVersion,
   getPublicResume,
-  togglePublicStatus
+  togglePublicStatus,
+  reorderResumes,
+  toggleFavoriteStatus
 } = require('../controllers/resumeController');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -23,11 +25,13 @@ router.use(protect);
 
 router.get('/', getResumes);
 router.post('/', saveResume);
+router.patch('/reorder', reorderResumes);
 router.delete('/:id', deleteResume);
 router.post('/:id/duplicate', duplicateResume);
 router.patch('/:id/rename', renameResume);
 router.patch('/:id/tags', updateTags);
 router.patch('/:id/public', togglePublicStatus);
+router.patch('/:id/favorite', toggleFavoriteStatus);
 
 router.get('/:id/versions', getVersions);
 router.post('/:id/versions', createVersion);

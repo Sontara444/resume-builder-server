@@ -70,7 +70,9 @@ const ResumeSchema = new mongoose.Schema({
   template: { type: String, default: 'vibrant' },
   themeColor: { type: String, default: '#ff9100' },
   tags: { type: [String], default: [] },
-  isPublic: { type: Boolean, default: false }
+  isPublic: { type: Boolean, default: false },
+  isFavorite: { type: Boolean, default: false },
+  order: { type: Number, default: 0 }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Resume', ResumeSchema);

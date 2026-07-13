@@ -5,10 +5,35 @@ const ResumeVersion = require('../models/ResumeVersion');
 // @route   GET /api/resumes
 exports.getResumes = async (req, res) => {
   try {
-    const resumes = await Resume.find({ userId: req.user._id }).sort({ lastModified: -1 });
+    const resumes = await Resume.find({ userId: req.user._id }).sort({ isFavorite: -1, order: 1, lastModified: -1 });
     res.json(resumes);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch resumes' });
+  }
+};
+
+// @desc    Reorder resumes
+// @route   PATCH /api/resumes/reorder
+exports.reorderResumes = async (req, res) => {
+  try {
+    const { updates } = req.body;
+    if (!Array.isArray(updates)) {
+      return res.status(400).json({ error: 'Updates must be an array' });
+    }
+
+    const operations = updates.map(({ id, order }) => ({
+      updateOne: {
+        filter: { _id: id, userId: req.user._id },
+        update: { order }
+      }
+    }));
+
+    if (operations.length > 0) {
+      await Resume.bulkWrite(operations);
+    }
+    res.json({ message: 'Resumes reordered successfully' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reorder resumes' });
   }
 };
 
@@ -276,5 +301,32 @@ exports.togglePublicStatus = async (req, res) => {
     res.json(resume);
   } catch (err) {
     res.status(500).json({ error: 'Failed to update public status' });
+  }
+};
+
+// @desc    Toggle favorite status of a resume
+// @route   PATCH /api/resumes/:id/favorite
+exports.toggleFavoriteStatus = async (req, res) => {
+  try {
+    const { isFavorite } = req.body;
+    if (typeof isFavorite !== 'boolean') {
+      return res.status(400).json({ error: 'isFavorite must be a boolean' });
+    }
+
+    const resume = await Resume.findById(req.params.id);
+    if (!resume) {
+      return res.status(404).json({ error: 'Resume not found' });
+    }
+
+    if (resume.userId !== String(req.user._id)) {
+      return res.status(403).json({ error: 'Not authorized to modify this resume' });
+    }
+
+    resume.isFavorite = isFavorite;
+    resume.lastModified = Date.now();
+    await resume.save();
+    res.json(resume);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update favorite status' });
   }
 };
