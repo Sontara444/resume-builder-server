@@ -175,3 +175,88 @@ Keywords:`;
   }
 };
 
+exports.analyzeJob = async (req, res) => {
+  try {
+    const { jdText, resumeText } = req.body;
+    if (!jdText || !resumeText) {
+      return res.status(400).json({ error: 'Job description and resume text are required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      
+      const prompt = `You are an expert ATS optimization specialist. 
+I will provide a Job Description and a Resume Text. 
+Analyze the job description for the most critical keywords, skills, and qualifications. Then compare them against the resume text.
+Output a valid JSON object with EXACTLY the following structure:
+{
+  "matchPercentage": (number between 0-100),
+  "matchingKeywords": ["keyword1", "keyword2"],
+  "missingKeywords": ["keyword3", "keyword4"],
+  "aiSuggestions": ["suggestion 1", "suggestion 2"]
+}
+
+Job Description:
+"""${jdText}"""
+
+Resume Text:
+"""${resumeText}"""
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+      
+      if (text.startsWith('```json')) {
+        text = text.replace(/^```json/, '').replace(/```$/, '').trim();
+      } else if (text.startsWith('```')) {
+        text = text.replace(/^```/, '').replace(/```$/, '').trim();
+      }
+
+      const data = JSON.parse(text);
+      return res.json(data);
+    }
+    
+    return res.status(503).json({ error: 'AI service unavailable' });
+  } catch (err) {
+    console.error('Error analyzing job:', err);
+    res.status(500).json({ error: 'Failed to analyze job description' });
+  }
+};
+
+exports.improveWithKeywords = async (req, res) => {
+  try {
+    const { text, section, missingKeywords } = req.body;
+    if (!text || !missingKeywords || !Array.isArray(missingKeywords)) {
+      return res.status(400).json({ error: 'Text and missingKeywords array are required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const keywordsList = missingKeywords.join(', ');
+      const prompt = `You are an expert resume writer and ATS optimization specialist.
+I have a section of a resume ("${section || 'general'}") that needs to naturally include some missing keywords without sounding forced or keyword-stuffed.
+Rewrite the following text to naturally incorporate as many of these missing keywords as logically possible.
+Keep the professional tone and action-oriented format. DO NOT add intro/outro text. Return ONLY the rewritten text.
+
+Missing Keywords: ${keywordsList}
+
+Original Text:
+"${text}"
+
+Rewritten Text:`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return res.json({ improvedText: response.text().trim() });
+    }
+
+    return res.status(503).json({ error: 'AI service unavailable' });
+  } catch (err) {
+    console.error('Error improving text with keywords:', err);
+    res.status(500).json({ error: 'Failed to improve text with keywords' });
+  }
+};
