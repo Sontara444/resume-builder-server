@@ -260,3 +260,71 @@ Rewritten Text:`;
     res.status(500).json({ error: 'Failed to improve text with keywords' });
   }
 };
+
+exports.fixWeakness = async (req, res) => {
+  try {
+    const { resumeData, weakness } = req.body;
+    if (!resumeData || !weakness) {
+      return res.status(400).json({ error: 'Resume data and weakness are required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `You are an expert resume writer and ATS optimization specialist.
+I have a resume that has been flagged with the following weakness: "${weakness}"
+Please analyze the provided resume JSON and return an updated version of the JSON that resolves this weakness.
+For example, if the weakness is "Missing summary", generate a strong summary based on the work experience. 
+If the weakness is "Few technical keywords", add relevant keywords to the skills section based on the projects/experience.
+Return ONLY valid JSON that matches the exact structure of the provided resume JSON. Do not include markdown formatting or explanations.
+
+Original Resume JSON:
+${JSON.stringify(resumeData)}
+
+Updated Resume JSON:`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+      
+      const match = text.match(/\`\`\`(?:json)?\s*([\s\S]*?)\s*\`\`\`/);
+      if (match) {
+        text = match[1].trim();
+      } else {
+        // Fallback: try to find the first { and last }
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+          text = text.slice(start, end + 1);
+        }
+      }
+
+      const updatedData = JSON.parse(text);
+      return res.json({ updatedData });
+    }
+
+    // Fallback logic if no API key
+    let updatedData = { ...resumeData };
+    if (weakness.toLowerCase().includes('summary')) {
+      updatedData.summary = (updatedData.summary || '') + ' Experienced professional with a proven track record of delivering high-quality results.';
+    } else if (weakness.toLowerCase().includes('skill') || weakness.toLowerCase().includes('keyword')) {
+      if (updatedData.skills && updatedData.skills.length > 0) {
+        updatedData.skills[0].items.push('Communication', 'Problem Solving', 'Leadership');
+      }
+    } else if (weakness.toLowerCase().includes('experience') || weakness.toLowerCase().includes('verb')) {
+      if (updatedData.experience && updatedData.experience.length > 0) {
+        updatedData.experience[0].description = 'Managed and optimized processes to achieve significant performance improvements. ' + (updatedData.experience[0].description || '');
+      }
+    } else {
+      // Generic fallback
+      if (!updatedData.summary) updatedData.summary = 'Dedicated professional seeking new opportunities.';
+    }
+
+    return res.json({ updatedData });
+  } catch (err) {
+    console.error('Error fixing weakness:', err.message || err);
+    // console.error('Full error:', err);
+    res.status(500).json({ error: 'Failed to fix weakness with AI' });
+  }
+};
