@@ -69,6 +69,7 @@ const ResumeSchema = new mongoose.Schema({
   ],
   template: { type: String, default: 'vibrant' },
   themeColor: { type: String, default: '#ff9100' },
+  fontFamily: { type: String, default: 'Inter' },
   tags: { type: [String], default: [] },
   isPublic: { type: Boolean, default: false },
   isFavorite: { type: Boolean, default: false },
