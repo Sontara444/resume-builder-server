@@ -324,7 +324,80 @@ Updated Resume JSON:`;
     return res.json({ updatedData });
   } catch (err) {
     console.error('Error fixing weakness:', err.message || err);
-    // console.error('Full error:', err);
     res.status(500).json({ error: 'Failed to fix weakness with AI' });
+  }
+};
+
+exports.reviewResume = async (req, res) => {
+  try {
+    const { resumeData } = req.body;
+    if (!resumeData) {
+      return res.status(400).json({ error: 'Resume data is required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `You are an expert AI Resume Reviewer, ATS specialist, and grammar checker.
+Analyze the following resume JSON. Find spelling mistakes, grammar mistakes, punctuation issues, weak action verbs, repeated words, and formatting inconsistencies in the text content (descriptions, summaries, titles).
+Return ONLY a valid JSON object with the exact structure below. Do not include markdown formatting or explanations.
+
+{
+  "writingScore": (number 0-100),
+  "issues": [
+    {
+      "type": "spelling|grammar|weak_verb|formatting|tone|completeness",
+      "severity": "error|suggestion",
+      "originalText": "exact original text substring that needs fixing",
+      "suggestedFix": "the corrected text",
+      "reason": "Brief explanation of why this needs fixing",
+      "section": "summary|experience|projects|skills|education|personal"
+    }
+  ]
+}
+
+Ensure "originalText" is an EXACT substring from the resume text so it can be automatically replaced.
+
+Resume Data:
+${JSON.stringify(resumeData)}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+      
+      const match = text.match(/\`\`\`(?:json)?\s*([\s\S]*?)\s*\`\`\`/);
+      if (match) {
+        text = match[1].trim();
+      } else {
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start !== -1 && end !== -1) {
+          text = text.slice(start, end + 1);
+        }
+      }
+
+      const reviewData = JSON.parse(text);
+      return res.json(reviewData);
+    }
+
+    // Fallback logic if no API key
+    return res.json({
+      writingScore: 85,
+      issues: [
+        {
+          type: "spelling",
+          severity: "suggestion",
+          originalText: "Ensure your API key is set",
+          suggestedFix: "Set your API key",
+          reason: "Gemini API key is missing, so this is a placeholder.",
+          section: "summary"
+        }
+      ]
+    });
+  } catch (err) {
+    console.error('Error reviewing resume:', err.message || err);
+    res.status(500).json({ error: 'Failed to review resume with AI' });
   }
 };
