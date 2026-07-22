@@ -119,6 +119,45 @@ Optimized version:`;
   }
 };
 
+exports.fixSpelling = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Text content is required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+        const prompt = `You are an expert proofreader.
+Fix any spelling, grammar, and punctuation mistakes in the following text. Do not rewrite or alter the underlying meaning or structure, just fix the errors. If the text has no errors, return it exactly as is. DO NOT add any conversational text or quotes.
+
+Original text:
+"${text}"
+
+Fixed text:`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const fixedText = response.text().trim();
+        if (fixedText) {
+          return res.json({ fixedText });
+        }
+      } catch (geminiError) {
+        console.warn('Gemini API call failed for fixSpelling:', geminiError.message);
+      }
+    }
+
+    // Fallback: just return original text if no API available
+    return res.json({ fixedText: text });
+  } catch (err) {
+    console.error('Error fixing spelling:', err);
+    res.status(500).json({ error: 'Failed to fix spelling' });
+  }
+};
+
 const fallbackExtractKeywords = (jdText) => {
   const commonTech = ['react', 'node.js', 'node', 'express', 'mongodb', 'sql', 'nosql', 'postgres', 'postgresql', 'mysql', 'docker', 'kubernetes', 'aws', 'gcp', 'azure', 'typescript', 'javascript', 'python', 'java', 'c++', 'c#', 'ruby', 'go', 'rust', 'graphql', 'rest', 'api', 'redux', 'next.js', 'vue', 'angular', 'html', 'css', 'sass', 'tailwind', 'git', 'ci/cd', 'agile', 'scrum', 'jira', 'linux'];
   const lowerJd = jdText.toLowerCase();
