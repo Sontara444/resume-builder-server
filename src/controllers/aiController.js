@@ -440,3 +440,46 @@ ${JSON.stringify(resumeData)}
     res.status(500).json({ error: 'Failed to review resume with AI' });
   }
 };
+
+exports.generateCoverLetter = async (req, res) => {
+  try {
+    const { resumeData, jobTitle, jobDescription } = req.body;
+    if (!resumeData) {
+      return res.status(400).json({ error: 'Resume data is required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' }); // Using pro for better text generation
+
+      let prompt = `You are an expert career coach and professional cover letter writer.
+Based on the following resume data, generate a compelling, professional cover letter.
+Make sure it sounds natural, confident, and highlights the most relevant skills and experiences.
+Do NOT include placeholder addresses or generic "Dear Hiring Manager" if a name can't be found, just use "Dear Hiring Manager,".
+Structure the letter properly with an opening, body paragraphs highlighting achievements, and a professional closing.
+Return ONLY the text of the cover letter, no markdown formatting like \`\`\`, no intro or outro text.
+
+Resume Data:
+${JSON.stringify(resumeData)}`;
+
+      if (jobTitle || jobDescription) {
+        prompt += `\n\nTarget Job Role: ${jobTitle || 'Not specified'}`;
+        prompt += `\nTarget Job Description (use this to tailor the letter): ${jobDescription || 'Not specified'}`;
+      }
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+      
+      return res.json({ coverLetter: text });
+    }
+
+    // Fallback logic if no API key
+    return res.json({
+      coverLetter: "Dear Hiring Manager,\n\nI am writing to express my interest in the position. With my background and skills, I am confident I would be a great fit for your team. My resume details my accomplishments and qualifications.\n\nThank you for your time and consideration.\n\nSincerely,\n" + (resumeData?.personal?.fullName || "Applicant")
+    });
+  } catch (err) {
+    console.error('Error generating cover letter:', err.message || err);
+    res.status(500).json({ error: 'Failed to generate cover letter' });
+  }
+};
