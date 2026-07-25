@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter } = require('../controllers/aiController');
+const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter, generateSuggestions } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/improve', protect, improveText);
@@ -11,5 +11,6 @@ router.post('/fix-weakness', protect, fixWeakness);
 router.post('/review', protect, reviewResume);
 router.post('/fix-spelling', protect, fixSpelling);
 router.post('/generate-cover-letter', protect, generateCoverLetter);
+router.post('/generate-suggestions', protect, generateSuggestions);
 
 module.exports = router;

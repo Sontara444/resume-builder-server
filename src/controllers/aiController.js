@@ -503,3 +503,58 @@ ${JSON.stringify(resumeData)}`;
     res.status(500).json({ error: 'Failed to generate cover letter' });
   }
 };
+
+
+exports.generateSuggestions = async (req, res) => {
+  try {
+    const { role, sectionType } = req.body;
+    if (!role) {
+      return res.status(400).json({ error: 'Role/Job title is required' });
+    }
+
+    if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `You are an expert resume writer. Generate 5 strong, ATS-optimized bullet points for the '${sectionType || 'experience'}' section of a resume for a '${role}'.
+Make them clean, concise, achievement-oriented, and professional in tone. Use action verbs at the start.
+Keep each bullet point under 25 words. Do not include introductory text, markdown formatting, or quotes.
+Return ONLY a valid JSON array of strings. Example: ["Developed scalable APIs using Node.js.", "Optimized database queries..."]`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text().trim();
+      
+      // Clean up potential markdown formatting in response
+      if (text.startsWith('```json')) {
+        text = text.replace(/^```json/, '').replace(/```$/, '').trim();
+      } else if (text.startsWith('```')) {
+        text = text.replace(/^```/, '').replace(/```$/, '').trim();
+      }
+      
+      try {
+        const suggestions = JSON.parse(text);
+        if (Array.isArray(suggestions)) {
+          return res.json({ suggestions });
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI response as JSON:', text);
+      }
+    }
+
+    // Fallback logic
+    return res.json({
+      suggestions: [
+        `Collaborated with cross-functional teams to deliver ${role} projects on time.`,
+        `Optimized existing processes to improve efficiency and reduce overhead.`,
+        `Spearheaded the development of key features, resulting in increased user engagement.`,
+        `Conducted rigorous testing and quality assurance for all deliverables.`,
+        `Maintained detailed documentation and provided technical support to stakeholders.`
+      ]
+    });
+  } catch (err) {
+    console.error('Error generating suggestions:', err.message || err);
+    res.status(500).json({ error: 'Failed to generate suggestions' });
+  }
+};
