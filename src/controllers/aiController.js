@@ -280,13 +280,16 @@ exports.analyzeJob = async (req, res) => {
       try {
         const prompt = `You are an expert ATS optimization specialist. 
 I will provide a Job Description and a Resume Text. 
-Analyze the job description for the most critical keywords, skills, and qualifications. Then compare them against the resume text.
+Analyze the job description for the most critical keywords, skills, qualifications, and experience requirements. Then compare them against the resume text.
 Output a valid JSON object with EXACTLY the following structure:
 {
   "matchPercentage": (number between 0-100),
   "matchingKeywords": ["keyword1", "keyword2"],
   "missingKeywords": ["keyword3", "keyword4"],
-  "aiSuggestions": ["suggestion 1", "suggestion 2"]
+  "aiSuggestions": ["suggestion 1", "suggestion 2"],
+  "experienceRequirements": "experience requirement details (e.g. 3+ years of React)",
+  "importantKeywords": ["key skill 1", "key skill 2"],
+  "recommendedImprovements": ["improvement 1", "improvement 2"]
 }
 
 Job Description:
@@ -315,7 +318,10 @@ Resume Text:
         matchPercentage: 0,
         matchingKeywords: [],
         missingKeywords: [],
-        aiSuggestions: ["Please add more detail to the job description to get AI suggestions."]
+        aiSuggestions: ["Please add more detail to the job description to get AI suggestions."],
+        experienceRequirements: "Not specified",
+        importantKeywords: [],
+        recommendedImprovements: []
       });
     }
 
@@ -344,14 +350,33 @@ Resume Text:
       aiSuggestions.push("Excellent match! Your resume matches all extracted keywords from the job description.");
     }
 
+    // Try to find experience patterns like "3+ years", "5 years", etc.
+    let experienceRequirements = "Not specified";
+    const expMatch = jdText.match(/\b(\d+\+?\s*(?:year|yr)s?)\b/i);
+    if (expMatch) {
+      experienceRequirements = `${expMatch[1]} experience recommended`;
+    }
+
+    const importantKeywords = [...keywords];
+    const recommendedImprovements = [];
+    if (missingKeywords.length > 0) {
+      recommendedImprovements.push(`Add missing core skills: ${missingKeywords.slice(0, 3).join(', ')} to your Skills section.`);
+      recommendedImprovements.push(`Provide project evidence illustrating your knowledge of ${missingKeywords.slice(0, 2).join(' and ')}.`);
+    } else {
+      recommendedImprovements.push("No urgent improvements needed. Keep your resume current.");
+    }
+
     return res.json({
       matchPercentage,
       matchingKeywords,
       missingKeywords,
-      aiSuggestions
+      aiSuggestions,
+      experienceRequirements,
+      importantKeywords,
+      recommendedImprovements
     });
   } catch (err) {
-    console.error('Error analyzing job:', err);
+    console.error('Error analyzing job description:', err);
     res.status(500).json({ error: 'Failed to analyze job description' });
   }
 };
