@@ -672,7 +672,7 @@ ${JSON.stringify(resumeData)}`;
 
 exports.generateSuggestions = async (req, res) => {
   try {
-    const { role, sectionType } = req.body;
+    const { role, sectionType, context } = req.body;
     if (!role) {
       return res.status(400).json({ error: 'Role/Job title is required' });
     }
@@ -680,8 +680,22 @@ exports.generateSuggestions = async (req, res) => {
     const model = getGenerativeModel('gemini-1.5-flash', true);
     if (model) {
       try {
-        const prompt = `You are an expert resume writer. Generate 5 strong, ATS-optimized bullet points for the '${sectionType || 'experience'}' section of a resume for a '${role}'.
-Make them clean, concise, achievement-oriented, and professional in tone. Use action verbs at the start.
+        let prompt = `You are an expert resume writer. Generate 5 strong, ATS-optimized bullet points for the '${sectionType || 'experience'}' section of a resume for a '${role}'.`;
+        
+        if (context?.techStack) {
+          prompt += `\nIncorporate these specific technologies naturally if applicable: ${context.techStack}.`;
+        }
+        if (context?.company) {
+          prompt += `\nTailor the achievements to a company or project named: ${context.company}.`;
+        }
+        if (context?.existingPoints && Array.isArray(context.existingPoints)) {
+          const existing = context.existingPoints.filter(p => typeof p === 'string' ? p.trim() : (p?.text || '').trim());
+          if (existing.length > 0) {
+            prompt += `\nThe user has already written the following points, so DO NOT duplicate their meaning:\n- ${existing.join('\n- ')}`;
+          }
+        }
+        
+        prompt += `\n\nMake them clean, concise, achievement-oriented, and professional in tone. Use action verbs at the start.
 Keep each bullet point under 25 words. Do not include introductory text, markdown formatting, or quotes.
 Return ONLY a valid JSON array of strings. Example: ["Developed scalable APIs using Node.js.", "Optimized database queries..."]`;
 
