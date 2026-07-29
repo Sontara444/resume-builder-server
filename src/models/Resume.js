@@ -76,6 +76,10 @@ const ResumeSchema = new mongoose.Schema({
   tags: { type: [String], default: [] },
   isPublic: { type: Boolean, default: false },
   isFavorite: { type: Boolean, default: false },
+  coverLetter: {
+    text: { type: String, default: '' }
+  },
+  isCoverLetterMode: { type: Boolean, default: false },
   order: { type: Number, default: 0 }
 }, { timestamps: true });
 

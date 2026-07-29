@@ -633,7 +633,7 @@ exports.generateCoverLetter = async (req, res) => {
       return res.status(400).json({ error: 'Resume data is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-pro');
+    const model = getGenerativeModel('gemini-1.5-flash');
     if (model) {
       try {
         let prompt = `You are an expert career coach and professional cover letter writer.
