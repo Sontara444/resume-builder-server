@@ -67,7 +67,7 @@ const ResumeSchema = new mongoose.Schema({
       ]
     }
   ],
-  template: { type: String, default: 'vibrant' },
+  template: { type: String, default: 'modern-professional' },
   themeColor: { type: String, default: '#ff9100' },
   fontFamily: { type: String, default: 'Inter' },
   fontSize: { type: Number, default: 16 },
