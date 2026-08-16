@@ -106,7 +106,13 @@ exports.duplicateResume = async (req, res) => {
     delete duplicateData.createdAt;
     delete duplicateData.updatedAt;
 
-    duplicateData.name = `${duplicateData.name} (Copy)`;
+    const copyMatch = duplicateData.name.match(/\((\d+)\)$/);
+    if (copyMatch) {
+      const num = parseInt(copyMatch[1], 10) + 1;
+      duplicateData.name = duplicateData.name.replace(/\(\d+\)$/, `(${num})`);
+    } else {
+      duplicateData.name = `${duplicateData.name} (1)`;
+    }
     duplicateData.userId = req.user._id;
     duplicateData.lastModified = Date.now();
 
