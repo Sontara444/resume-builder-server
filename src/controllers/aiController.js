@@ -726,3 +726,50 @@ Return ONLY a valid JSON array of strings. Example: ["Developed scalable APIs us
     res.status(500).json({ error: 'Failed to generate suggestions' });
   }
 };
+
+exports.chatCopilot = async (req, res) => {
+  try {
+    const { message, chatHistory, resumeData } = req.body;
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const model = getGenerativeModel('gemini-1.5-flash');
+    if (model) {
+      try {
+        const historyContext = (chatHistory || []).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+        
+        const prompt = `You are a Career Copilot, an expert AI resume coach embedded in a resume builder app.
+Your goal is to help the user improve their resume by providing actionable advice, rephrasing bullet points, or answering their questions based on their current resume state.
+Keep your responses concise, professional, and directly useful. Do not output markdown code blocks unless providing a specific text snippet for them to copy.
+
+CURRENT RESUME DATA:
+${JSON.stringify(resumeData || {}, null, 2)}
+
+CHAT HISTORY:
+${historyContext}
+
+USER MESSAGE:
+${message}
+
+YOUR RESPONSE:`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const reply = response.text().trim();
+        return res.json({ reply });
+      } catch (geminiError) {
+        console.warn('Gemini API call failed for chat copilot:', geminiError.message);
+      }
+    }
+
+    // Fallback logic if no API key
+    return res.json({
+      reply: "I'm sorry, my AI backend is currently offline. Please configure your Gemini API key to chat with me!"
+    });
+  } catch (err) {
+    console.error('Error in chatCopilot:', err.message || err);
+    res.status(500).json({ error: 'Failed to process chat message' });
+  }
+};
+
