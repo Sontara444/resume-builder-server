@@ -607,16 +607,45 @@ ${JSON.stringify(resumeData)}
     }
 
     // Fallback logic if no API key
+    let fallbackOriginal = "Ensure your API key is set";
+    let fallbackFix = "Set your API key";
+    let fallbackSection = "summary";
+    
+    // Find a real string from the resume to use as a placeholder
+    let sourceText = "";
+    if (resumeData) {
+      if (resumeData.summary && typeof resumeData.summary === 'string' && resumeData.summary.trim().length > 5) {
+        sourceText = resumeData.summary;
+        fallbackSection = "summary";
+      } else if (resumeData.experience && resumeData.experience.length > 0 && resumeData.experience[0].description) {
+        sourceText = Array.isArray(resumeData.experience[0].description) 
+          ? resumeData.experience[0].description[0] 
+          : resumeData.experience[0].description;
+        fallbackSection = "experience";
+      } else if (resumeData.personal && resumeData.personal.fullName) {
+        sourceText = resumeData.personal.fullName;
+        fallbackSection = "personal";
+      }
+    }
+
+    if (sourceText && typeof sourceText === 'string' && sourceText.trim().length > 5) {
+      const words = sourceText.trim().split(/\s+/);
+      if (words.length >= 2) {
+        fallbackOriginal = words.slice(0, 2).join(' ');
+        fallbackFix = fallbackOriginal + " (API key needed)";
+      }
+    }
+
     return res.json({
       writingScore: 85,
       issues: [
         {
           type: "spelling",
           severity: "suggestion",
-          originalText: "Ensure your API key is set",
-          suggestedFix: "Set your API key",
+          originalText: fallbackOriginal,
+          suggestedFix: fallbackFix,
           reason: "Gemini API key is missing, so this is a placeholder.",
-          section: "summary"
+          section: fallbackSection
         }
       ]
     });
