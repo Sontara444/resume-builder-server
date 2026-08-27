@@ -808,7 +808,70 @@ YOUR RESPONSE:`;
     });
   } catch (err) {
     console.error('Error in chatCopilot:', err.message || err);
-    res.status(500).json({ error: 'Failed to process chat message' });
+    res.status(500).json({ error: 'Failed to chat with AI' });
   }
 };
 
+exports.tailorResume = async (req, res) => {
+  try {
+    const { resumeData, jdText } = req.body;
+    if (!resumeData || !jdText) {
+      return res.status(400).json({ error: 'Resume data and Job Description are required' });
+    }
+
+    const model = getGenerativeModel('gemini-1.5-flash', true);
+    if (model) {
+      try {
+        const prompt = `You are an expert ATS optimization specialist and resume writer.
+I will provide a Job Description and a full Resume JSON.
+Your task is to tailor the resume to perfectly match the Job Description.
+Specifically:
+1. Rewrite the "summary" to align with the core requirements of the job.
+2. Tweak "experience" descriptions (bullet points) to naturally weave in missing keywords and highlight relevant achievements. Do not invent fake experience, just rephrase to emphasize the right skills.
+3. Update "skills" array by adding extracted job description keywords naturally where they fit.
+4. Keep all other sections exactly the same as the original.
+
+Return ONLY a valid JSON object representing the ENTIRE updated resume, using the EXACT same schema as the input Resume JSON.
+
+Job Description:
+"""${jdText}"""
+
+Original Resume JSON:
+${JSON.stringify(resumeData)}
+`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().trim();
+        const tailoredResume = safeParseJSON(text, null);
+        
+        if (tailoredResume) {
+          return res.json({ tailoredData: tailoredResume });
+        }
+      } catch (geminiError) {
+        console.warn('Gemini API call failed for tailorResume, falling back:', geminiError.message);
+      }
+    }
+
+    // Fallback logic if no API key
+    const fallbackData = JSON.parse(JSON.stringify(resumeData));
+    if (fallbackData.summary) {
+      fallbackData.summary = `[TAILORED] ${fallbackData.summary} (This is a mock tailored summary since Gemini API is missing)`;
+    } else {
+      fallbackData.summary = "[TAILORED] Dedicated professional matching all the requirements of this job description. (Mock summary)";
+    }
+    
+    // Add a mock skill
+    if (!fallbackData.skills || fallbackData.skills.length === 0) {
+      fallbackData.skills = [{ id: 'mock', category: 'Skills', items: ['Tailored Skill'] }];
+    } else {
+      fallbackData.skills[0].items = [...(fallbackData.skills[0].items || []), 'Tailored Skill'];
+    }
+
+    return res.json({ tailoredData: fallbackData });
+
+  } catch (err) {
+    console.error('Error tailoring resume:', err.message || err);
+    res.status(500).json({ error: 'Failed to tailor resume' });
+  }
+};
