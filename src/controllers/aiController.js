@@ -875,3 +875,98 @@ ${JSON.stringify(resumeData)}
     res.status(500).json({ error: 'Failed to tailor resume' });
   }
 };
+
+exports.optimizeLayout = async (req, res) => {
+  try {
+    const { resumeData, currentOrder } = req.body;
+    if (!resumeData || !currentOrder) {
+      return res.status(400).json({ error: 'Resume data and current order are required' });
+    }
+
+    const model = getGenerativeModel('gemini-1.5-flash', true);
+    if (model) {
+      try {
+        const prompt = `You are an expert ATS optimization specialist and resume writer.
+Analyze this resume's data to determine the optimal layout order for their sections.
+- If the user is a recent graduate (e.g., graduated recently or in the future), "education" should typically go above "experience".
+- If the user is an experienced professional (e.g., 2+ years of experience), "experience" should go above "education".
+- If they are heavily technical, "skills" might belong near the top.
+- "summary" should almost always be first.
+
+I will provide you with the current order of their section IDs.
+You MUST return ONLY a valid JSON array containing the exact SAME strings from the current order, but rearranged in the most strategic ATS-friendly order. 
+Do NOT add any new strings or remove any strings from the list.
+
+Current Order:
+${JSON.stringify(currentOrder)}
+
+Resume Data:
+${JSON.stringify(resumeData)}
+`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text().trim();
+        const optimizedOrder = safeParseJSON(text, null);
+        
+        if (optimizedOrder && Array.isArray(optimizedOrder) && optimizedOrder.length === currentOrder.length) {
+          return res.json({ optimizedOrder });
+        }
+      } catch (geminiError) {
+        console.warn('Gemini API call failed for optimizeLayout, falling back:', geminiError.message);
+      }
+    }
+
+    // Fallback logic if no API key or API fails
+    // Simple heuristic: if education is recent/future, education first.
+    let isRecentGrad = false;
+    if (resumeData.education && resumeData.education.length > 0) {
+      const latestEdu = resumeData.education[0];
+      if (latestEdu.endDate) {
+        const currentYear = new Date().getFullYear();
+        // If end date contains a year > currentYear - 2
+        const match = latestEdu.endDate.match(/\\d{4}/);
+        if (match && parseInt(match[0]) >= currentYear - 1) {
+          isRecentGrad = true;
+        } else if (latestEdu.endDate.toLowerCase().includes('present')) {
+          isRecentGrad = true;
+        }
+      }
+    }
+
+    let fallbackOrder = [...currentOrder];
+    // Strip summary, experience, education, skills from fallbackOrder temporarily
+    const core = ['summary', 'experience', 'education', 'skills'];
+    const others = fallbackOrder.filter(id => !core.includes(id));
+    
+    let newOrder = ['summary'];
+    if (isRecentGrad) {
+      newOrder.push('education');
+      if (fallbackOrder.includes('skills')) newOrder.push('skills');
+      newOrder.push('experience');
+    } else {
+      newOrder.push('experience');
+      if (fallbackOrder.includes('skills')) newOrder.push('skills');
+      newOrder.push('education');
+    }
+    
+    // Add any remaining core sections not added (e.g. they were removed by user)
+    const finalOrder = [];
+    newOrder.forEach(id => {
+      if (currentOrder.includes(id)) {
+        finalOrder.push(id);
+      }
+    });
+    
+    // Add custom/other sections to the end
+    others.forEach(id => {
+      finalOrder.push(id);
+    });
+
+    return res.json({ optimizedOrder: finalOrder });
+
+  } catch (err) {
+    console.error('Error optimizing layout:', err.message || err);
+    res.status(500).json({ error: 'Failed to optimize layout' });
+  }
+};
