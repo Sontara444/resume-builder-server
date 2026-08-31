@@ -1,7 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter, generateSuggestions, chatCopilot, tailorResume, optimizeLayout } = require('../controllers/aiController');
+const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter, generateSuggestions, chatCopilot, tailorResume, optimizeLayout, parsePdf } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
+const multer = require('multer');
+
+// Configure multer for memory storage (we just need the buffer)
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  }
+});
 
 router.post('/improve', protect, improveText);
 router.post('/extract-keywords', protect, extractKeywords);
@@ -15,5 +24,6 @@ router.post('/generate-suggestions', protect, generateSuggestions);
 router.post('/chat', protect, chatCopilot);
 router.post('/tailor', protect, tailorResume);
 router.post('/optimize-layout', protect, optimizeLayout);
+router.post('/parse-pdf', protect, upload.single('resumePdf'), parsePdf);
 
 module.exports = router;

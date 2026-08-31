@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const pdfParse = require('pdf-parse');
 
 // Centralized helper to get Gemini model or return null if not configured
 const getGenerativeModel = (modelName = 'gemini-1.5-flash', requireJson = false) => {
@@ -970,3 +971,134 @@ ${JSON.stringify(resumeData)}
     res.status(500).json({ error: 'Failed to optimize layout' });
   }
 };
+
+const fallbackParsePdf = (text) => {
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  const phoneMatch = text.match(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  
+  return {
+    personal: {
+      fullName: "Imported Resume",
+      email: emailMatch ? emailMatch[0] : "",
+      phone: phoneMatch ? phoneMatch[0] : "",
+      location: "",
+      title: "",
+      website: "",
+      linkedin: "",
+      github: ""
+    },
+    summary: "--- IMPORTED TEXT DUMP ---\n" + text.slice(0, 1500) + (text.length > 1500 ? "...\n[Text truncated. Please configure Gemini API for structured extraction.]" : ""),
+    skills: [],
+    experience: [],
+    projects: [],
+    education: []
+  };
+};
+
+exports.parsePdf = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+    
+    // Extract text from PDF buffer
+    const data = await pdfParse(req.file.buffer);
+    const pdfText = data.text;
+    
+    if (!pdfText || !pdfText.trim()) {
+       return res.status(400).json({ error: 'Could not extract text from the PDF' });
+    }
+
+    const model = getGenerativeModel('gemini-1.5-flash', true);
+    if (!model) {
+      console.warn('Gemini API key not configured, falling back to basic extraction');
+      return res.json({ parsedData: fallbackParsePdf(pdfText) });
+    }
+
+    const prompt = `You are an expert ATS parser and data extractor.
+I will provide you with the raw text extracted from a PDF resume.
+Extract the information into a valid JSON object strictly matching the schema below.
+If a section is missing from the resume, leave it as an empty array or empty string as appropriate.
+
+SCHEMA:
+{
+  "personal": {
+    "fullName": "First Last",
+    "email": "email@example.com",
+    "phone": "555-555-5555",
+    "location": "City, State",
+    "title": "Professional Title (e.g. Software Engineer)",
+    "website": "https://...",
+    "linkedin": "https://linkedin.com/in/...",
+    "github": "https://github.com/..."
+  },
+  "summary": "Professional summary...",
+  "skills": [
+    {
+      "id": "generate a short random string",
+      "category": "e.g. Frontend, Backend, Tools",
+      "items": ["React", "Node.js"]
+    }
+  ],
+  "experience": [
+    {
+      "id": "generate a short random string",
+      "company": "Company Name",
+      "position": "Job Title",
+      "location": "City, State",
+      "startDate": "Month Year",
+      "endDate": "Month Year or Present",
+      "description": ["Accomplishment 1", "Accomplishment 2"]
+    }
+  ],
+  "projects": [
+    {
+      "id": "generate a short random string",
+      "name": "Project Name",
+      "technologies": "Tech used",
+      "url": "Project URL",
+      "startDate": "Month Year",
+      "endDate": "Month Year",
+      "description": ["Detail 1", "Detail 2"]
+    }
+  ],
+  "education": [
+    {
+      "id": "generate a short random string",
+      "school": "University Name",
+      "degree": "Degree (e.g. BS Computer Science)",
+      "location": "City, State",
+      "startDate": "Year",
+      "endDate": "Year",
+      "gpa": "3.8"
+    }
+  ]
+}
+
+RESUME TEXT:
+"""
+${pdfText}
+"""
+`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const jsonText = response.text().trim();
+      const parsedData = safeParseJSON(jsonText, null);
+      
+      if (parsedData) {
+         return res.json({ parsedData });
+      } else {
+         throw new Error('Failed to parse AI response into JSON');
+      }
+    } catch (geminiError) {
+      console.warn('Gemini API call failed for PDF parsing, falling back:', geminiError.message);
+      return res.json({ parsedData: fallbackParsePdf(pdfText) });
+    }
+  } catch (err) {
+    console.error('Error parsing PDF:', err.message || err);
+    res.status(500).json({ error: `Failed to process the PDF resume: ${err.message || err}` });
+  }
+};
+
