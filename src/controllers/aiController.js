@@ -984,49 +984,65 @@ const fallbackParsePdf = (text) => {
     skills: ''
   };
 
-  const lines = text.split('\n');
-  let currentSection = 'summary';
+  // Improved fallback parser that uses regex to find sections even if they lack newlines
+  const headerRegex = /(?:^|\n)\s*(summary|about me|profile|skills|technical skills|expertise|experience|work experience|employment history|professional experience|projects|personal projects|education|academic background)\b|\b(SUMMARY|ABOUT ME|PROFILE|SKILLS|TECHNICAL SKILLS|EXPERTISE|EXPERIENCE|WORK EXPERIENCE|EMPLOYMENT HISTORY|PROFESSIONAL EXPERIENCE|PROJECTS|PERSONAL PROJECTS|EDUCATION|ACADEMIC BACKGROUND)\b|\b(Summary|About Me|Profile|Skills|Technical Skills|Expertise|Experience|Work Experience|Employment History|Professional Experience|Projects|Personal Projects|Education|Academic Background)\b/g;
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    
-    const normalizedLine = line.toLowerCase().replace(/[^a-z\s]/g, '').trim();
-    let isHeader = false;
-    
-    // Heuristic: line should not be too long to be a standalone header, 
-    // or it clearly starts with the section name
-    if (line.length < 60) {
-      if (['experience', 'work experience', 'employment history', 'professional experience'].some(k => normalizedLine === k || normalizedLine.startsWith(k + ' '))) {
-        currentSection = 'experience';
-        isHeader = true;
-      } else if (['projects', 'personal projects'].some(k => normalizedLine === k || normalizedLine.startsWith(k + ' '))) {
-        currentSection = 'projects';
-        isHeader = true;
-      } else if (['education', 'academic background', 'academic history'].some(k => normalizedLine === k || normalizedLine.startsWith(k + ' '))) {
-        currentSection = 'education';
-        isHeader = true;
-      } else if (['skills', 'technical skills', 'technologies', 'core competencies', 'expertise'].some(k => normalizedLine === k || normalizedLine.startsWith(k + ' '))) {
-        currentSection = 'skills';
-        isHeader = true;
-      } else if (['summary', 'about me', 'profile', 'professional summary', 'objective'].some(k => normalizedLine === k || normalizedLine.startsWith(k + ' '))) {
-        currentSection = 'summary';
-        isHeader = true;
-      }
+  let currentSection = 'summary';
+  let lastIndex = 0;
+  
+  let match;
+  while ((match = headerRegex.exec(text)) !== null) {
+    const chunk = text.slice(lastIndex, match.index).trim();
+    if (chunk) {
+      sections[currentSection] += chunk + '\n';
     }
     
-    if (isHeader) {
-      // Don't skip the line if it has extra text (e.g. "Experience: Microsoft")
-      const words = normalizedLine.split(' ');
-      if (words.length > 2) {
-        sections[currentSection] += line + '\n';
-      }
-      continue;
+    const headerStr = (match[1] || match[2] || match[3] || '').toLowerCase();
+    
+    if (['experience', 'work experience', 'employment history', 'professional experience'].includes(headerStr)) {
+      currentSection = 'experience';
+    } else if (['projects', 'personal projects'].includes(headerStr)) {
+      currentSection = 'projects';
+    } else if (['education', 'academic background'].includes(headerStr)) {
+      currentSection = 'education';
+    } else if (['skills', 'technical skills', 'expertise'].includes(headerStr)) {
+      currentSection = 'skills';
+    } else if (['summary', 'about me', 'profile'].includes(headerStr)) {
+      currentSection = 'summary';
     }
     
-    sections[currentSection] += line + '\n';
+    lastIndex = headerRegex.lastIndex;
   }
   
+  const finalChunk = text.slice(lastIndex).trim();
+  if (finalChunk) {
+    sections[currentSection] += finalChunk + '\n';
+  }
+  
+  // Format the extracted sections to fit the JSON schema
+  const formatList = (str) => {
+    if (!str.trim()) return [];
+    // Split by common delimiters (new lines, bullet points) or fall back to splitting by sentences if no newlines
+    const parts = str.split(/[\n•]+/).map(s => s.trim()).filter(Boolean);
+    if (parts.length === 1 && parts[0].length > 100) {
+      // If it's one huge block, try splitting by sentences roughly
+      return parts[0].split(/(?<=\.)\s+/).filter(Boolean);
+    }
+    return parts;
+  };
+  
+  const formatSkills = (str) => {
+    if (!str.trim()) return [];
+    // Skills are often comma separated or newline separated
+    let items = [];
+    if (str.includes(',')) {
+      items = str.split(',').map(s => s.trim()).filter(Boolean);
+    } else {
+      items = str.split(/[\n•]+/).map(s => s.trim()).filter(Boolean);
+    }
+    return [{ id: Date.now().toString() + 's', category: 'Imported Skills', items }];
+  };
+
   return {
     personal: {
       fullName: "Imported Resume",
@@ -1038,8 +1054,8 @@ const fallbackParsePdf = (text) => {
       linkedin: "",
       github: ""
     },
-    summary: sections.summary.trim() ? sections.summary.trim() : "",
-    skills: sections.skills.trim() ? [{ id: Date.now().toString() + 's', category: 'Imported Skills', items: sections.skills.split(/[\n,•]+/).map(s => s.trim()).filter(Boolean) }] : [],
+    summary: sections.summary.trim(),
+    skills: formatSkills(sections.skills),
     experience: sections.experience.trim() ? [{
       id: Date.now().toString() + 'e',
       company: 'Imported Experience Block',
@@ -1047,7 +1063,7 @@ const fallbackParsePdf = (text) => {
       location: '',
       startDate: '',
       endDate: '',
-      description: sections.experience.split(/[\n•]+/).map(s => s.trim()).filter(Boolean)
+      description: formatList(sections.experience)
     }] : [],
     projects: sections.projects.trim() ? [{
       id: Date.now().toString() + 'p',
@@ -1056,7 +1072,7 @@ const fallbackParsePdf = (text) => {
       url: '',
       startDate: '',
       endDate: '',
-      description: sections.projects.split(/[\n•]+/).map(s => s.trim()).filter(Boolean)
+      description: formatList(sections.projects)
     }] : [],
     education: sections.education.trim() ? [{
       id: Date.now().toString() + 'ed',
