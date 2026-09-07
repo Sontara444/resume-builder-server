@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const pdfParse = require('pdf-parse');
 
 // Centralized helper to get Gemini model or return null if not configured
-const getGenerativeModel = (modelName = 'gemini-1.5-flash', requireJson = false) => {
+const getGenerativeModel = (modelName = 'gemini-3.5-flash', requireJson = false) => {
   if (!process.env.GEMINI_API_KEY || !process.env.GEMINI_API_KEY.trim()) {
     return null;
   }
@@ -140,7 +140,7 @@ exports.improveText = async (req, res) => {
       return res.status(400).json({ error: 'Text content is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         const prompt = `You are an expert resume writer and ATS optimization specialist.
@@ -177,7 +177,7 @@ exports.fixSpelling = async (req, res) => {
       return res.status(400).json({ error: 'Text content is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         const prompt = `You are an expert proofreader.
@@ -238,7 +238,7 @@ exports.extractKeywords = async (req, res) => {
       return res.status(400).json({ error: 'Job description content is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         const prompt = `You are an expert technical recruiter and ATS optimization specialist.
@@ -276,7 +276,7 @@ exports.analyzeJob = async (req, res) => {
       return res.status(400).json({ error: 'Job description and resume text are required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         const prompt = `You are an expert ATS optimization specialist. 
@@ -389,7 +389,7 @@ exports.improveWithKeywords = async (req, res) => {
       return res.status(400).json({ error: 'Text and missingKeywords array are required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         const keywordsList = missingKeywords.join(', ');
@@ -437,7 +437,7 @@ exports.fixWeakness = async (req, res) => {
       return res.status(400).json({ error: 'Resume data and weakness are required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         const prompt = `You are an expert resume writer and ATS optimization specialist.
@@ -568,7 +568,7 @@ exports.reviewResume = async (req, res) => {
       return res.status(400).json({ error: 'Resume data is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         const prompt = `You are an expert AI Resume Reviewer, ATS specialist, and grammar checker.
@@ -673,7 +673,7 @@ exports.generateCoverLetter = async (req, res) => {
       return res.status(400).json({ error: 'Resume data is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         let prompt = `You are an expert career coach and professional cover letter writer.
@@ -717,7 +717,7 @@ exports.generateSuggestions = async (req, res) => {
       return res.status(400).json({ error: 'Role/Job title is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         let prompt = `You are an expert resume writer. Generate 5 strong, ATS-optimized bullet points for the '${sectionType || 'experience'}' section of a resume for a '${role}'.`;
@@ -774,7 +774,7 @@ exports.chatCopilot = async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash');
+    const model = getGenerativeModel('gemini-3.5-flash');
     if (model) {
       try {
         const historyContext = (chatHistory || []).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
@@ -820,7 +820,7 @@ exports.tailorResume = async (req, res) => {
       return res.status(400).json({ error: 'Resume data and Job Description are required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         const prompt = `You are an expert ATS optimization specialist and resume writer.
@@ -884,7 +884,7 @@ exports.optimizeLayout = async (req, res) => {
       return res.status(400).json({ error: 'Resume data and current order are required' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (model) {
       try {
         const prompt = `You are an expert ATS optimization specialist and resume writer.
@@ -1050,7 +1050,7 @@ const fallbackParsePdf = (text) => {
       phone: phoneMatch ? phoneMatch[0] : "",
       location: "",
       title: "",
-      website: "",
+      portfolio: "",
       linkedin: "",
       github: ""
     },
@@ -1067,9 +1067,9 @@ const fallbackParsePdf = (text) => {
     }] : [],
     projects: sections.projects.trim() ? [{
       id: Date.now().toString() + 'p',
-      name: 'Imported Projects Block',
-      technologies: '',
-      url: '',
+      title: 'Imported Projects Block',
+      tech: '',
+      link: '',
       startDate: '',
       endDate: '',
       description: formatList(sections.projects)
@@ -1100,7 +1100,7 @@ exports.parsePdf = async (req, res) => {
        return res.status(400).json({ error: 'Could not extract text from the PDF' });
     }
 
-    const model = getGenerativeModel('gemini-1.5-flash', true);
+    const model = getGenerativeModel('gemini-3.5-flash', true);
     if (!model) {
       console.warn('Gemini API key not configured, falling back to basic extraction');
       return res.json({ parsedData: fallbackParsePdf(pdfText) });
@@ -1119,7 +1119,7 @@ SCHEMA:
     "phone": "555-555-5555",
     "location": "City, State",
     "title": "Professional Title (e.g. Software Engineer)",
-    "website": "https://...",
+    "portfolio": "https://...",
     "linkedin": "https://linkedin.com/in/...",
     "github": "https://github.com/..."
   },
@@ -1145,9 +1145,9 @@ SCHEMA:
   "projects": [
     {
       "id": "generate a short random string",
-      "name": "Project Name",
-      "technologies": "Tech used",
-      "url": "Project URL",
+      "title": "Project Name",
+      "tech": "Tech used",
+      "link": "Project URL",
       "startDate": "Month Year",
       "endDate": "Month Year",
       "description": ["Detail 1", "Detail 2"]
