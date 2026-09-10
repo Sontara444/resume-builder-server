@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const generateToken = require('../utils/generateToken');
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // @desc    Register a new user
 // @route   POST /api/auth/signup
@@ -88,8 +90,58 @@ const getMe = async (req, res) => {
   }
 };
 
+// @desc    Authenticate user with Google & get token
+// @route   POST /api/auth/google
+// @access  Public
+const googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    
+    if (!credential) {
+      return res.status(400).json({ error: 'Google credential is required' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name: fullName } = payload;
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      if (user.authProvider !== 'google') {
+        // Link google account to existing local account
+        user.googleId = googleId;
+        user.authProvider = 'google';
+        await user.save();
+      }
+    } else {
+      user = await User.create({
+        fullName,
+        email,
+        googleId,
+        authProvider: 'google',
+      });
+    }
+
+    return res.json({
+      _id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('Google login error:', error);
+    return res.status(401).json({ error: 'Google authentication failed' });
+  }
+};
+
 module.exports = {
   signup,
   login,
   getMe,
+  googleLogin,
 };
