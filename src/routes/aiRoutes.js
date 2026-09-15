@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter, generateSuggestions, chatCopilot, tailorResume, optimizeLayout, parsePdf } = require('../controllers/aiController');
+const { improveText, extractKeywords, analyzeJob, improveWithKeywords, fixWeakness, reviewResume, fixSpelling, generateCoverLetter, generateSuggestions, chatCopilot, tailorResume, optimizeLayout, parsePdf, parseLinkedIn } = require('../controllers/aiController');
 const { protect } = require('../middleware/authMiddleware');
 const multer = require('multer');
 
@@ -25,5 +25,6 @@ router.post('/chat', protect, chatCopilot);
 router.post('/tailor', protect, tailorResume);
 router.post('/optimize-layout', protect, optimizeLayout);
 router.post('/parse-pdf', protect, upload.single('resumePdf'), parsePdf);
+router.post('/parse-linkedin', protect, upload.single('linkedinPdf'), parseLinkedIn);
 
 module.exports = router;

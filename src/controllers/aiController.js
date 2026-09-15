@@ -1193,3 +1193,113 @@ ${pdfText}
   }
 };
 
+exports.parseLinkedIn = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No PDF file uploaded' });
+    }
+    
+    // Extract text from PDF buffer
+    const data = await pdfParse(req.file.buffer);
+    const pdfText = data.text;
+    
+    if (!pdfText || !pdfText.trim()) {
+       return res.status(400).json({ error: 'Could not extract text from the LinkedIn PDF' });
+    }
+
+    const model = getGenerativeModel('gemini-3.5-flash', true);
+    if (!model) {
+      console.warn('Gemini API key not configured, falling back to basic extraction');
+      return res.json({ parsedData: fallbackParsePdf(pdfText) });
+    }
+
+    const prompt = `You are an expert ATS parser and data extractor.
+I will provide you with the raw text extracted from a LinkedIn "Save to PDF" profile export.
+LinkedIn PDFs have distinct markers like "Contact", "Top Skills", "Summary", "Experience" (where a company might have multiple roles under it), and "Education".
+Extract the information into a valid JSON object strictly matching the schema below.
+If a section is missing from the resume, leave it as an empty array or empty string as appropriate.
+Be careful to associate job titles with their respective companies, and parse dates into "Month Year" format.
+
+SCHEMA:
+{
+  "personal": {
+    "fullName": "First Last",
+    "email": "email@example.com",
+    "phone": "555-555-5555",
+    "location": "City, State",
+    "title": "Professional Title (e.g. Software Engineer)",
+    "portfolio": "https://...",
+    "linkedin": "https://linkedin.com/in/...",
+    "github": "https://github.com/..."
+  },
+  "summary": "Professional summary...",
+  "skills": [
+    {
+      "id": "generate a short random string",
+      "category": "e.g. Top Skills",
+      "items": ["React", "Node.js"]
+    }
+  ],
+  "experience": [
+    {
+      "id": "generate a short random string",
+      "company": "Company Name",
+      "position": "Job Title",
+      "location": "City, State",
+      "startDate": "Month Year",
+      "endDate": "Month Year or Present",
+      "description": ["Accomplishment 1", "Accomplishment 2"]
+    }
+  ],
+  "projects": [
+    {
+      "id": "generate a short random string",
+      "title": "Project Name",
+      "tech": "Tech used",
+      "link": "Project URL",
+      "startDate": "Month Year",
+      "endDate": "Month Year",
+      "description": ["Detail 1", "Detail 2"]
+    }
+  ],
+  "education": [
+    {
+      "id": "generate a short random string",
+      "school": "University Name",
+      "degree": "Degree (e.g. BS Computer Science)",
+      "location": "City, State",
+      "startDate": "Year",
+      "endDate": "Year",
+      "gpa": "3.8"
+    }
+  ]
+}
+
+LINKEDIN PDF TEXT:
+"""
+${pdfText}
+"""
+`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const jsonText = response.text().trim();
+      const parsedData = safeParseJSON(jsonText, null);
+      
+      if (parsedData) {
+         return res.json({ parsedData });
+      } else {
+         throw new Error('Failed to parse AI response into JSON');
+      }
+    } catch (geminiError) {
+      console.warn('Gemini API call failed for LinkedIn parsing, falling back:', geminiError.message);
+      return res.json({ parsedData: fallbackParsePdf(pdfText) });
+    }
+  } catch (err) {
+    console.error('Error parsing LinkedIn PDF:', err.message || err);
+    res.status(500).json({ error: `Failed to process the LinkedIn profile: ${err.message || err}` });
+  }
+};
+
+
