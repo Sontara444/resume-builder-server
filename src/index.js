@@ -6,6 +6,7 @@ const resumeRoutes = require('./routes/resumeRoutes');
 const contactRoutes = require('./routes/contactRoutes');
 const authRoutes = require('./routes/authRoutes');
 const aiRoutes = require('./routes/aiRoutes');
+const exportRoutes = require('./routes/exportRoutes');
 
 const app = express();
 
@@ -16,13 +17,14 @@ const startServer = async () => {
 
     // Middleware
     app.use(cors());
-    app.use(express.json());
+    app.use(express.json({ limit: '10mb' }));
 
     // Routes
     app.use('/api/resumes', resumeRoutes);
     app.use('/api/contact', contactRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/ai', aiRoutes);
+    app.use('/api/export', exportRoutes);
 
     // Health Check
     app.get('/', (req, res) => {
