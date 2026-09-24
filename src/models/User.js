@@ -33,13 +33,13 @@ const UserSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Pre-save password hashing
-UserSchema.pre('save', async function (next) {
+// Mongoose 9 no longer passes `next` to middleware; async hooks just return
+UserSchema.pre('save', async function () {
   if (!this.isModified('password') || !this.password) {
-    return next();
+    return;
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
-  next();
 });
 
 // Compare password helper
